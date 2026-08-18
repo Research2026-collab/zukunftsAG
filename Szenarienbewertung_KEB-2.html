@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Szenarienbewertung – KEB Landesgeschäftsstelle</title>
+<style>
+  :root {
+    --bg: #F7F9FA;
+    --surface: #FFFFFF;
+    --border: #DCE7E8;
+    --text: #24282A;
+    --text-secondary: #62706F;
+    --text-tertiary: #9AA6A5;
+    --accent: #E72371;
+    --accent-bg: #FCE4EE;
+    --teal: #7BC9CE;
+    --teal-bg: #E6F5F6;
+    --pp: #C6E2B5; --pp-text: #2F5A1F;
+    --p: #E3F0D7;  --p-text: #3B6D11;
+    --o: #EDEBE3;  --o-text: #6B675F;
+    --m: #F6DED9;  --m-text: #99381C;
+    --mm: #F0C4B9; --mm-text: #791F1F;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2rem; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif; line-height: 1.5;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1 { font-family: Georgia, "Times New Roman", serif; font-size: 26px; font-weight: 400; margin: 0 0 4px; }
+  h1 .h1-bar { display: inline-block; width: 40px; height: 3px; background: linear-gradient(90deg, var(--accent), var(--teal)); margin-bottom: 6px; }
+  h2 { font-family: Georgia, "Times New Roman", serif; font-size: 19px; font-weight: 400; margin: 2.5rem 0 0.75rem; }
+  h3 { font-size: 15px; font-weight: 600; margin: 0 0 6px; }
+  .sub { color: var(--text-secondary); font-size: 14px; margin: 0 0 1.5rem; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 1.1rem 1.3rem; margin-bottom: 0.9rem;
+  }
+  .scenario-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+  @media (max-width: 760px) { .scenario-grid { grid-template-columns: 1fr; } }
+  .scenario-desc { font-size: 13.5px; color: var(--text-secondary); white-space: pre-line; }
+  .scenario-title { font-family: Georgia, serif; font-size: 16px; margin: 0 0 2px; }
+  .scenario-tag { font-size: 12.5px; color: var(--accent); font-style: italic; margin: 0 0 8px; }
+  .open-flag {
+    display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 20px;
+    background: var(--accent-bg); color: var(--accent); margin-bottom: 8px; font-weight: 600;
+  }
+  .placeholder-card { border-style: dashed; background: var(--teal-bg); }
+  [contenteditable="true"]:empty::before { content: attr(data-placeholder); color: var(--text-tertiary); }
+  textarea.note {
+    width: 100%; min-height: 54px; border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 8px; font-family: inherit; font-size: 13px; resize: vertical; margin-top: 6px;
+    background: #FCFAF6;
+  }
+
+  .dims { display: grid; gap: 10px; }
+  .dim-row {
+    display: grid; grid-template-columns: 1fr 100px 60px; gap: 12px; align-items: center;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px;
+  }
+  .dim-name { font-size: 13.5px; }
+  .dim-row input[type=range] { width: 100%; }
+  .dim-points { text-align: right; font-variant-numeric: tabular-nums; font-size: 13.5px; }
+  .points-summary { font-size: 13px; color: var(--text-secondary); margin-top: 8px; }
+  .points-summary.warn { color: #99381C; font-weight: 600; }
+
+  table { border-collapse: collapse; font-size: 13px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; width: 100%; }
+  th { text-align: left; padding: 9px 10px; font-weight: 600; border-bottom: 1px solid var(--border); background: var(--teal-bg); }
+  td { padding: 8px 10px; vertical-align: middle; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+
+  .footer-bar {
+    margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--border);
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+  button {
+    font-family: inherit; font-size: 13.5px; padding: 9px 16px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer;
+  }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button:hover { filter: brightness(0.97); }
+  .addscn { text-align: center; }
+  .addscn button { margin-top: 8px; }
+  #printView { display: none; }
+  @media print {
+    body * { visibility: hidden; }
+    #printView, #printView * { visibility: visible; }
+    #printView { display: block; position: absolute; left: 0; top: 0; width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><span class="h1-bar"></span><br>Szenarienbewertung – KEB Landesgeschäftsstelle Rheinland-Pfalz</h1>
+  <p class="sub">Zukunfts-AG · Sitzung am 19.08.2026 in Mainz</p>
+
+  <h2>Szenarien</h2>
+  <div id="scenarioList" class="scenario-grid"></div>
+  <div class="addscn">
+    <button id="addScenarioBtn">+ Weiteres Szenario hinzufügen</button>
+  </div>
+
+  <h2>Erwartungen an die Geschäftsstelle</h2>
+  <p class="sub">Verteile 100 Punkte auf die fünf Erwartungen, je nachdem wie hoch ihre Priorität für die Bewertung der Szenarien eingeschätzt wird.</p>
+  <div class="dims" id="dimList"></div>
+  <div class="points-summary" id="pointsSummary"></div>
+
+  <div class="footer-bar">
+    <button class="primary" id="exportWordBtn">Als Word-Dokument exportieren</button>
+    <button id="exportPdfBtn">Als PDF exportieren</button>
+    <button id="resetBtn">Zurücksetzen</button>
+  </div>
+</div>
+
+<div id="printView"></div>
+
+<script>
+let scenarios = [
+  {
+    name: "Stabilisierte Kernorganisation",
+    tag: "KEB Landesgeschäftsstelle als abgesicherte Infrastruktur mit reduziertem, am WBG ausgerichtetem Auftrag",
+    description: "Dieses Szenario beschreibt eine Konsolidierung der KEB auf Kernaufgaben. Die KEB behauptet ihre Rolle als gesetzlich anerkannte Landesstelle, fokussiert sich auf unverzichtbare Funktionen (z. B. Interessenvertretung, Qualitätssicherung, rechtliche und administrative Entlastung der Einrichtungen) und reduziert projektgetriebene Expansion. Die Finanzierung bleibt angespannt, aber kalkulierbar und müsste verlässlich und langfristig über öffentliche Mittel, die Diözesen und Mitglieder gesichert werden. Innovation findet punktuell statt und dient primär der Systemstabilität, nicht der Profilschärfung und -erhaltung.",
+    open: false
+  },
+  {
+    name: "Mitglieder- und projektbasierte Konsolidierung und Profilierung",
+    tag: "Kernaufgaben der Landesgeschäftsstelle werden durch Projekte ergänzt, die zugleich Reputation sichern, finanzielle Ressourcen mobilisieren und Mitglieder entlasten",
+    description: "Die Landesgeschäftsstelle behauptet ihre Rolle als gesetzlich anerkannte Landesstelle, fokussiert sich auf unverzichtbare Funktionen (z. B. Interessenvertretung, Qualitätssicherung, rechtliche und administrative Entlastung der Einrichtungen) und verbindet dies systematisch mit Projektarbeit, Profilbildung und Kooperation. Projekte dienen zugleich der Finanzierung, der inhaltlichen Positionierung und der Vernetzung mit Partner:innen aus Bildung, Zivilgesellschaft, Kirche und Politik. Die Landesgeschäftsstelle agiert als koordinierende Plattform, die Innovation bündelt, Wissen transferiert und Sichtbarkeit auf Landes- und Bundesebene erzeugt. Die Projekte tragen zur finanziellen Konsolidierung bei.",
+    open: false
+  },
+  {
+    name: "Landesgeschäftsstelle als Profitcenter",
+    tag: "KEB Rheinland-Pfalz als eigenständiger, kommerziell agierender Weiterbildungsanbieter ohne strukturelle Beteiligung der Bistümer",
+    description: "In diesem Szenario ziehen sich die Bistümer vollständig aus dem Bereich Weiterbildung zurück. Eine institutionelle finanzielle Beteiligung entfällt, zugleich bestehen keine inhaltlichen oder strukturellen Ansprüche der Diözesen an die KEB. Die Landesgeschäftsstelle agiert als eigenständiger Weiterbildungsanbieter auf marktbasierten Grundlagen. Leistungen der Landesgeschäftsstelle werden ausschließlich über Landesmittel, Projektmittel, Entgelte und Verwaltungsgebühren finanziert. Einzelne Maßnahmen können gegen Gebühr über die Landesgeschäftsstelle administriert und abgerechnet werden. Die wirtschaftliche Tragfähigkeit beruht auf kostendeckenden Angeboten, Dienstleistungsverträgen, Projektmitteln und marktfähigen Weiterbildungsformaten.",
+    open: false
+  },
+  {
+    name: "Kooperationsmodell",
+    tag: "Anbindung der KEB-Landesgeschäftsstelle an verwandte Institutionen oder Zusammenschluss mit vergleichbaren Organisationen",
+    description: "Dieses Szenario ist noch offen und wird in der Zukunfts-AG weiter präzisiert. Zu klären ist, an welche verwandten Institutionen die KEB-Landesgeschäftsstelle gekoppelt werden könnte, etwa Caritas oder das Katholische Büro, oder ob ein Zusammenschluss mit einem Wohlfahrtsverband oder vergleichbaren Organisationen wie der ELAG infrage kommt.",
+    open: true
+  },
+  {
+    name: "",
+    tag: "",
+    description: "",
+    open: true,
+    placeholder: true
+  }
+];
+
+let dimensions = [
+  { name: "Interessenvertretung, Mitgestaltung der Rahmenbedingungen und Informationsweitergabe an die KEB", points: 20 },
+  { name: "Aktive Netzwerkarbeit, innerkirchlich, in der Weiterbildung und gegenüber gesellschaftlich relevanten Gruppen", points: 20 },
+  { name: "Reputation und Wirkung auf Landesebene durch eine geeignete Projektstrategie", points: 20 },
+  { name: "Refinanzierung der Erwachsenenbildung durch das Land", points: 20 },
+  { name: "Dienstleistungen, Services und Funktion als Zentralstelle", points: 20 }
+];
+
+// ratings[scenarioIndex][dimIndex] removed with the evaluation matrix; points allocation remains standalone
+let notes = scenarios.map(() => "");
+
+function totalPoints() { return dimensions.reduce((s, d) => s + Number(d.points), 0); }
+
+function renderScenarios() {
+  const el = document.getElementById('scenarioList');
+  el.innerHTML = '';
+  scenarios.forEach((s, i) => {
+    const div = document.createElement('div');
+    div.className = 'card' + (s.placeholder ? ' placeholder-card' : '');
+    div.innerHTML = `
+      ${s.open && !s.placeholder ? '<span class="open-flag">Noch zu präzisieren</span>' : ''}
+      ${s.placeholder ? '<span class="open-flag">Weiteres Szenario</span>' : ''}
+      <p class="scenario-title">Szenario ${i + 1}: <span contenteditable="true" data-field="name" data-i="${i}" data-placeholder="Titel eingeben …">${s.name}</span></p>
+      <p class="scenario-tag" contenteditable="true" data-field="tag" data-i="${i}" data-placeholder="Kurzbeschreibung eingeben …">${s.tag}</p>
+      <p class="scenario-desc" contenteditable="true" data-field="description" data-i="${i}" data-placeholder="Szenariotext eingeben …">${s.description}</p>
+      <textarea class="note" placeholder="Notizen / offene Fragen zu diesem Szenario" data-i="${i}">${notes[i]}</textarea>
+    `;
+    el.appendChild(div);
+  });
+  el.querySelectorAll('[data-field]').forEach(node => {
+    node.addEventListener('blur', e => {
+      const i = Number(e.target.dataset.i);
+      const field = e.target.dataset.field;
+      scenarios[i][field] = e.target.textContent.trim();
+    });
+  });
+  el.querySelectorAll('textarea.note').forEach(node => {
+    node.addEventListener('input', e => {
+      notes[Number(e.target.dataset.i)] = e.target.value;
+    });
+  });
+}
+
+function renderDims() {
+  const el = document.getElementById('dimList');
+  el.innerHTML = '';
+  dimensions.forEach((d, i) => {
+    const row = document.createElement('div');
+    row.className = 'dim-row';
+    row.innerHTML = `
+      <span class="dim-name" contenteditable="true" data-i="${i}">${d.name}</span>
+      <input type="range" min="0" max="100" value="${d.points}" data-i="${i}">
+      <span class="dim-points" id="dimPts${i}">${d.points}</span>
+    `;
+    el.appendChild(row);
+  });
+  el.querySelectorAll('input[type=range]').forEach(node => {
+    node.addEventListener('input', e => {
+      const i = Number(e.target.dataset.i);
+      dimensions[i].points = Number(e.target.value);
+      document.getElementById('dimPts' + i).textContent = e.target.value;
+      updatePointsSummary();
+    });
+  });
+  el.querySelectorAll('.dim-name').forEach(node => {
+    node.addEventListener('blur', e => {
+      dimensions[Number(e.target.dataset.i)].name = e.target.textContent.trim();
+    });
+  });
+  updatePointsSummary();
+}
+
+function updatePointsSummary() {
+  const tp = totalPoints();
+  const summary = document.getElementById('pointsSummary');
+  summary.textContent = `Vergeben: ${tp} von 100 Punkten`;
+  summary.className = tp === 100 ? 'points-summary' : 'points-summary warn';
+}
+
+document.getElementById('addScenarioBtn').addEventListener('click', () => {
+  scenarios.push({ name: '', tag: '', description: '', open: true, placeholder: true });
+  notes.push('');
+  renderScenarios();
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (confirm('Alle Punkte und Notizen zurücksetzen?')) {
+    dimensions.forEach(d => d.points = 20);
+    notes = scenarios.map(() => '');
+    renderDims();
+    renderScenarios();
+  }
+});
+
+function buildPrintHTML() {
+  let html = `<div style="font-family: Georgia, serif; padding: 20px;">
+    <h1 style="font-size:22px;">Szenarienbewertung – KEB Landesgeschäftsstelle Rheinland-Pfalz</h1>
+    <p style="color:#555;font-size:13px;">Zukunfts-AG · Sitzung am 19.08.2026 in Mainz</p>
+    <h2 style="font-size:17px;margin-top:24px;">Szenarien</h2>`;
+  scenarios.forEach((s, i) => {
+    if (s.placeholder && !s.name && !s.description) return;
+    html += `<div style="margin-bottom:14px;">
+      <h3 style="font-size:14px;margin:0 0 2px;">Szenario ${i + 1}: ${s.name || '(ohne Titel)'}${s.open ? ' (noch zu präzisieren)' : ''}</h3>
+      <p style="font-size:12px;color:#E72371;font-style:italic;margin:0 0 4px;">${s.tag}</p>
+      <p style="font-size:12.5px;color:#333;">${s.description}</p>
+      ${notes[i] ? `<p style="font-size:12px;color:#555;"><em>Notizen: ${notes[i]}</em></p>` : ''}
+    </div>`;
+  });
+  html += `<h2 style="font-size:17px;margin-top:24px;">Erwartungen an die Geschäftsstelle und Priorisierung</h2>
+    <table style="border-collapse:collapse;width:100%;font-size:12.5px;">
+      <tr><th style="text-align:left;border-bottom:1px solid #ccc;padding:5px;">Erwartung</th><th style="text-align:right;border-bottom:1px solid #ccc;padding:5px;">Punkte</th></tr>`;
+  dimensions.forEach(d => {
+    html += `<tr><td style="padding:5px;border-bottom:1px solid #eee;">${d.name}</td><td style="text-align:right;padding:5px;border-bottom:1px solid #eee;">${d.points}</td></tr>`;
+  });
+  html += `</table></div>`;
+  return html;
+}
+
+document.getElementById('exportPdfBtn').addEventListener('click', () => {
+  document.getElementById('printView').innerHTML = buildPrintHTML();
+  window.print();
+});
+
+document.getElementById('exportWordBtn').addEventListener('click', () => {
+  const html = buildPrintHTML();
+  const blob = new Blob(['<html><head><meta charset="utf-8"></head><body>' + html + '</body></html>'], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Szenarienbewertung_KEB.doc';
+  a.click();
+});
+
+renderScenarios();
+renderDims();
+</script>
+</body>
+</html>
