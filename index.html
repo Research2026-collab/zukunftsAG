@@ -64,6 +64,13 @@
   .dim-points { text-align: right; font-variant-numeric: tabular-nums; font-size: 13.5px; }
   .points-summary { font-size: 13px; color: var(--text-secondary); margin-top: 8px; }
   .points-summary.warn { color: #99381C; font-weight: 600; }
+  .name-field { margin-bottom: 12px; }
+  .name-field label { display: block; font-size: 12.5px; color: var(--text-secondary); margin-bottom: 4px; }
+  .name-field input {
+    font-family: inherit; font-size: 14px; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface); width: 260px; max-width: 100%;
+  }
+  .name-field input:focus { outline: 2px solid var(--teal); outline-offset: 1px; }
 
   table { border-collapse: collapse; font-size: 13px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; width: 100%; }
   th { text-align: left; padding: 9px 10px; font-weight: 600; border-bottom: 1px solid var(--border); background: var(--teal-bg); }
@@ -102,7 +109,11 @@
   </div>
 
   <h2>Erwartungen an die Geschäftsstelle</h2>
-  <p class="sub">Verteile 100 Punkte auf die fünf Erwartungen, je nachdem wie hoch ihre Priorität für die Bewertung der Szenarien eingeschätzt wird.</p>
+  <p class="sub">Verteile 100 Punkte auf die fünf Erwartungen, je nachdem wie hoch ihre Priorität für die Bewertung der Szenarien eingeschätzt wird. Trage vorab deinen Namen ein, damit deine Verteilung eindeutig zugeordnet werden kann.</p>
+  <div class="name-field">
+    <label for="personName">Dein Name</label>
+    <input type="text" id="personName" placeholder="Name eingeben">
+  </div>
   <div class="dims" id="dimList"></div>
   <div class="points-summary" id="pointsSummary"></div>
 
@@ -245,10 +256,20 @@ document.getElementById('resetBtn').addEventListener('click', () => {
 });
 
 function buildPrintHTML() {
+  const name = document.getElementById('personName').value.trim();
   let html = `<div style="font-family: Georgia, serif; padding: 20px;">
     <h1 style="font-size:22px;">Szenarienbewertung – KEB Landesgeschäftsstelle Rheinland-Pfalz</h1>
     <p style="color:#555;font-size:13px;">Zukunfts-AG · Sitzung am 19.08.2026 in Mainz</p>
-    <h2 style="font-size:17px;margin-top:24px;">Szenarien</h2>`;
+    ${name ? `<p style="font-size:15px;margin-top:10px;"><strong>Eingetragen von:</strong> ${name}</p>` : '<p style="font-size:13px;color:#99381C;"><em>Kein Name eingetragen</em></p>'}
+    <h2 style="font-size:17px;margin-top:24px;">Erwartungen an die Geschäftsstelle und Priorisierung</h2>
+    <table style="border-collapse:collapse;width:100%;font-size:13px;">
+      <tr><th style="text-align:left;border-bottom:1px solid #ccc;padding:6px;">Erwartung</th><th style="text-align:right;border-bottom:1px solid #ccc;padding:6px;">Punkte</th></tr>`;
+  dimensions.forEach(d => {
+    html += `<tr><td style="padding:6px;border-bottom:1px solid #eee;">${d.name}</td><td style="text-align:right;padding:6px;border-bottom:1px solid #eee;font-weight:bold;">${d.points}</td></tr>`;
+  });
+  html += `<tr><td style="padding:6px;font-weight:bold;">Summe</td><td style="text-align:right;padding:6px;font-weight:bold;">${totalPoints()}</td></tr>`;
+  html += `</table>
+    <h2 style="font-size:17px;margin-top:24px;">Szenarien zur Orientierung</h2>`;
   scenarios.forEach((s, i) => {
     if (s.placeholder && !s.name && !s.description) return;
     html += `<div style="margin-bottom:14px;">
@@ -258,13 +279,7 @@ function buildPrintHTML() {
       ${notes[i] ? `<p style="font-size:12px;color:#555;"><em>Notizen: ${notes[i]}</em></p>` : ''}
     </div>`;
   });
-  html += `<h2 style="font-size:17px;margin-top:24px;">Erwartungen an die Geschäftsstelle und Priorisierung</h2>
-    <table style="border-collapse:collapse;width:100%;font-size:12.5px;">
-      <tr><th style="text-align:left;border-bottom:1px solid #ccc;padding:5px;">Erwartung</th><th style="text-align:right;border-bottom:1px solid #ccc;padding:5px;">Punkte</th></tr>`;
-  dimensions.forEach(d => {
-    html += `<tr><td style="padding:5px;border-bottom:1px solid #eee;">${d.name}</td><td style="text-align:right;padding:5px;border-bottom:1px solid #eee;">${d.points}</td></tr>`;
-  });
-  html += `</table></div>`;
+  html += `</div>`;
   return html;
 }
 
@@ -275,13 +290,16 @@ document.getElementById('exportPdfBtn').addEventListener('click', () => {
 
 document.getElementById('exportWordBtn').addEventListener('click', () => {
   const html = buildPrintHTML();
+  const name = document.getElementById('personName').value.trim();
+  const safeName = name ? '_' + name.replace(/[^a-zA-Z0-9äöüÄÖÜß]+/g, '-') : '';
   const blob = new Blob(['<html><head><meta charset="utf-8"></head><body>' + html + '</body></html>'], { type: 'application/msword' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'Szenarienbewertung_KEB.doc';
+  a.download = 'Szenarienbewertung_KEB' + safeName + '.doc';
   a.click();
 });
+
 
 renderScenarios();
 renderDims();
