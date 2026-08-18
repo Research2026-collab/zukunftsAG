@@ -117,10 +117,6 @@
       <h1>Szenarienbewertung – KEB Landesgeschäftsstelle Rheinland-Pfalz</h1>
       <p class="sub">Zukunfts-AG · Sitzung am 19.08.2026 in Mainz</p>
     </div>
-    <div class="qr-box">
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=https%3A%2F%2Fresearch2026-collab.github.io%2FzukunftsAG%2F%23eingabe" alt="QR-Code zur Eingabeseite" width="120" height="120">
-      <p>Mit dem Handy scannen und direkt zur Punkteverteilung springen</p>
-    </div>
   </div>
 
   <h2>Szenarien</h2>
@@ -130,19 +126,36 @@
   </div>
 
   <h2 id="eingabe">Erwartungen an die Geschäftsstelle</h2>
-  <p class="sub">Verteile 100 Punkte auf die fünf Erwartungen, je nachdem wie hoch ihre Priorität für die Bewertung der Szenarien eingeschätzt wird. Trage vorab deinen Namen ein, damit deine Verteilung eindeutig zugeordnet werden kann.</p>
+  <div class="header-row" style="align-items:flex-start;">
+    <p class="sub" style="flex:1;min-width:260px;">Verteile 100 Punkte auf die fünf Erwartungen, je nachdem wie hoch ihre Priorität für die Bewertung der Szenarien eingeschätzt wird. Trage deinen Namen ein und sende deine Verteilung anschließend direkt ab, sie erscheint dann automatisch unten in der Ergebnisliste.</p>
+    <div class="qr-box">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=https%3A%2F%2Fresearch2026-collab.github.io%2FzukunftsAG%2F%23eingabe" alt="QR-Code zur Eingabeseite" width="120" height="120">
+      <p>Mit dem Handy scannen und direkt zur Punkteverteilung springen</p>
+    </div>
+  </div>
   <div class="name-field">
     <label for="personName">Dein Name</label>
     <input type="text" id="personName" placeholder="Name eingeben">
   </div>
   <div class="dims" id="dimList"></div>
   <div class="points-summary" id="pointsSummary"></div>
+  <button class="primary" id="submitResultBtn" style="margin-top:12px;">Rückmeldung absenden</button>
+  <p class="points-summary" id="submitStatus"></p>
+
+  <h2 id="ergebnisse">Ergebnisse der Zukunfts-AG</h2>
+  <p class="sub">Diese Liste wird automatisch aus den abgesendeten Rückmeldungen zusammengestellt. Bei Bedarf lässt sie sich manuell aktualisieren.</p>
+  <button id="refreshResultsBtn">Ergebnisse aktualisieren</button>
+
+  <div style="overflow-x:auto;margin-top:12px;">
+    <table id="resultsTable"></table>
+  </div>
+  <p class="points-summary" id="resultsEmptyNote">Noch keine Rückmeldungen erfasst.</p>
 
   <div class="footer-bar">
     <button class="primary" id="exportWordBtn">Als Word-Dokument exportieren</button>
     <button id="exportPdfBtn">Als PDF exportieren</button>
-    <button id="resetBtn">Zurücksetzen</button>
   </div>
+
 </div>
 
 <div id="printView"></div>
@@ -261,19 +274,95 @@ function updatePointsSummary() {
   summary.className = tp === 100 ? 'points-summary' : 'points-summary warn';
 }
 
+// ---------- Ergebnisse (über Google Apps Script gesammelt) ----------
+// Nach der Bereitstellung des Apps Script als Web-App hier die /exec-URL eintragen.
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzdsWsABvKsVM67RCJb-nCSO87BDvs-jrP4gRBPgacfqSDDtmGwwo6x2UL3Ah9ANwPH/exec';
+
+let resultEntries = [];
+
+function computeAverage() {
+  if (resultEntries.length === 0) return null;
+  return dimensions.map((d, i) => {
+    const sum = resultEntries.reduce((s, r) => s + Number(r.points[i] || 0), 0);
+    return Math.round((sum / resultEntries.length) * 10) / 10;
+  });
+}
+
+function renderResultsTable() {
+  const table = document.getElementById('resultsTable');
+  const emptyNote = document.getElementById('resultsEmptyNote');
+  if (resultEntries.length === 0) {
+    table.innerHTML = '';
+    emptyNote.style.display = 'block';
+    return;
+  }
+  emptyNote.style.display = 'none';
+  let html = '<tr><th>Name</th>';
+  dimensions.forEach(d => { html += `<th>${d.name}</th>`; });
+  html += '<th>Summe</th></tr>';
+  resultEntries.forEach(r => {
+    const sum = r.points.reduce((s, v) => s + Number(v), 0);
+    html += `<tr><td><strong>${r.name}</strong></td>`;
+    r.points.forEach(p => { html += `<td>${p}</td>`; });
+    html += `<td>${sum}</td></tr>`;
+  });
+  const avg = computeAverage();
+  html += `<tr style="background:var(--teal-bg);"><td><strong>Durchschnitt (${resultEntries.length} Rückmeldungen)</strong></td>`;
+  avg.forEach(v => { html += `<td><strong>${v}</strong></td>`; });
+  html += `<td><strong>${avg.reduce((s, v) => s + v, 0).toFixed(1)}</strong></td></tr>`;
+  table.innerHTML = html;
+}
+
+async function loadResults() {
+  const emptyNote = document.getElementById('resultsEmptyNote');
+  if (!SCRIPT_URL || SCRIPT_URL.indexOf('PASTE_YOUR') === 0) {
+    emptyNote.textContent = 'Noch keine Apps-Script-URL hinterlegt. Ergebnisse können erst nach der Einrichtung geladen werden.';
+    emptyNote.style.display = 'block';
+    return;
+  }
+  try {
+    const res = await fetch(SCRIPT_URL, { method: 'GET' });
+    const data = await res.json();
+    resultEntries = data.entries || [];
+    renderResultsTable();
+  } catch (err) {
+    emptyNote.textContent = 'Ergebnisse konnten nicht geladen werden. Bitte Verbindung prüfen und erneut versuchen.';
+    emptyNote.style.display = 'block';
+  }
+}
+
+document.getElementById('refreshResultsBtn').addEventListener('click', loadResults);
+
+document.getElementById('submitResultBtn').addEventListener('click', async () => {
+  const nameInput = document.getElementById('personName');
+  const status = document.getElementById('submitStatus');
+  const name = nameInput.value.trim();
+  if (!name) { alert('Bitte zuerst deinen Namen eintragen.'); return; }
+  if (!SCRIPT_URL || SCRIPT_URL.indexOf('PASTE_YOUR') === 0) {
+    alert('Die Verbindung zur Ergebnisliste ist noch nicht eingerichtet. Bitte bei der Moderation melden.');
+    return;
+  }
+  const points = dimensions.map(d => d.points);
+  status.textContent = 'Wird gesendet …';
+  status.className = 'points-summary';
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ name, points })
+    });
+    status.textContent = `Danke, ${name}! Deine Rückmeldung wurde übermittelt.`;
+    await loadResults();
+  } catch (err) {
+    status.textContent = 'Senden fehlgeschlagen. Bitte erneut versuchen.';
+    status.className = 'points-summary warn';
+  }
+});
+
 document.getElementById('addScenarioBtn').addEventListener('click', () => {
   scenarios.push({ name: '', tag: '', description: '', open: true, placeholder: true });
   notes.push('');
   renderScenarios();
-});
-
-document.getElementById('resetBtn').addEventListener('click', () => {
-  if (confirm('Alle Punkte und Notizen zurücksetzen?')) {
-    dimensions.forEach(d => d.points = 20);
-    notes = scenarios.map(() => '');
-    renderDims();
-    renderScenarios();
-  }
 });
 
 function buildPrintHTML() {
@@ -289,8 +378,26 @@ function buildPrintHTML() {
     html += `<tr><td style="padding:6px;border-bottom:1px solid #eee;">${d.name}</td><td style="text-align:right;padding:6px;border-bottom:1px solid #eee;font-weight:bold;">${d.points}</td></tr>`;
   });
   html += `<tr><td style="padding:6px;font-weight:bold;">Summe</td><td style="text-align:right;padding:6px;font-weight:bold;">${totalPoints()}</td></tr>`;
-  html += `</table>
-    <h2 style="font-size:17px;margin-top:24px;">Szenarien zur Orientierung</h2>`;
+  html += `</table>`;
+  if (resultEntries.length > 0) {
+    const avg = computeAverage();
+    html += `<h2 style="font-size:17px;margin-top:24px;">Dokumentierte Rückmeldungen (${resultEntries.length})</h2>
+      <table style="border-collapse:collapse;width:100%;font-size:12px;">
+        <tr><th style="text-align:left;border-bottom:1px solid #ccc;padding:5px;">Name</th>`;
+    dimensions.forEach(d => { html += `<th style="border-bottom:1px solid #ccc;padding:5px;">${d.name}</th>`; });
+    html += `<th style="border-bottom:1px solid #ccc;padding:5px;">Summe</th></tr>`;
+    resultEntries.forEach(r => {
+      const sum = r.points.reduce((s, v) => s + Number(v), 0);
+      html += `<tr><td style="padding:5px;border-bottom:1px solid #eee;">${r.name}</td>`;
+      r.points.forEach(p => { html += `<td style="text-align:center;padding:5px;border-bottom:1px solid #eee;">${p}</td>`; });
+      html += `<td style="text-align:center;padding:5px;border-bottom:1px solid #eee;">${sum}</td></tr>`;
+    });
+    html += `<tr style="background:#E6F5F6;"><td style="padding:5px;font-weight:bold;">Durchschnitt</td>`;
+    avg.forEach(v => { html += `<td style="text-align:center;padding:5px;font-weight:bold;">${v}</td>`; });
+    html += `<td style="text-align:center;padding:5px;font-weight:bold;">${avg.reduce((s, v) => s + v, 0).toFixed(1)}</td></tr>`;
+    html += `</table>`;
+  }
+  html += `<h2 style="font-size:17px;margin-top:24px;">Szenarien zur Orientierung</h2>`;
   scenarios.forEach((s, i) => {
     if (s.placeholder && !s.name && !s.description) return;
     html += `<div style="margin-bottom:14px;">
@@ -324,6 +431,7 @@ document.getElementById('exportWordBtn').addEventListener('click', () => {
 
 renderScenarios();
 renderDims();
+loadResults();
 </script>
 </body>
 </html>
