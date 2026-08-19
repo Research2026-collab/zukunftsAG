@@ -48,6 +48,16 @@
   }
   .placeholder-card { border-style: dashed; background: var(--teal-bg); }
   [contenteditable="true"]:empty::before { content: attr(data-placeholder); color: var(--text-tertiary); }
+  .shortlist-label {
+    display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary);
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border);
+  }
+  .shortlist-label input { width: 15px; height: 15px; }
+  .scenario-select {
+    font-family: inherit; font-size: 14px; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface); width: 100%; max-width: 420px;
+  }
+  .submitted-note { font-size: 12px; color: var(--teal); margin-top: 4px; }
   textarea.note {
     width: 100%; min-height: 54px; border: 1px solid var(--border); border-radius: 6px;
     padding: 6px 8px; font-family: inherit; font-size: 13px; resize: vertical; margin-top: 6px;
@@ -127,7 +137,7 @@
 
   <h2 id="eingabe">Erwartungen an die Geschäftsstelle</h2>
   <div class="header-row" style="align-items:flex-start;">
-    <p class="sub" style="flex:1;min-width:260px;">Verteile 100 Punkte auf die fünf Erwartungen, je nachdem wie hoch ihre Priorität für die Bewertung der Szenarien eingeschätzt wird. Trage deinen Namen ein und sende deine Verteilung anschließend direkt ab, sie erscheint dann automatisch unten in der Ergebnisliste.</p>
+    <p class="sub" style="flex:1;min-width:260px;">Wähle zunächst eines der bis zu drei in die engere Auswahl genommenen Szenarien, dann verteile 100 Punkte auf die fünf Erwartungen, bezogen auf dieses eine Szenario. Sende deine Verteilung ab und wähle danach das nächste Szenario, um es ebenfalls zu bewerten.</p>
     <div class="qr-box">
       <img src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=https%3A%2F%2Fresearch2026-collab.github.io%2FzukunftsAG%2F%23eingabe" alt="QR-Code zur Eingabeseite" width="120" height="120">
       <p>Mit dem Handy scannen und direkt zur Punkteverteilung springen</p>
@@ -137,18 +147,23 @@
     <label for="personName">Dein Name</label>
     <input type="text" id="personName" placeholder="Name eingeben">
   </div>
+  <div class="name-field">
+    <label for="scenarioSelect">Szenario, das du gerade bewertest</label>
+    <select id="scenarioSelect" class="scenario-select">
+      <option value="">Bitte ein Szenario aus der engeren Auswahl wählen …</option>
+    </select>
+  </div>
   <div class="dims" id="dimList"></div>
   <div class="points-summary" id="pointsSummary"></div>
   <button class="primary" id="submitResultBtn" style="margin-top:12px;">Rückmeldung absenden</button>
   <p class="points-summary" id="submitStatus"></p>
+  <p class="submitted-note" id="submittedNote"></p>
 
   <h2 id="ergebnisse">Ergebnisse der Zukunfts-AG</h2>
-  <p class="sub">Diese Liste wird automatisch aus den abgesendeten Rückmeldungen zusammengestellt. Bei Bedarf lässt sie sich manuell aktualisieren.</p>
+  <p class="sub">Diese Listen werden automatisch aus den abgesendeten Rückmeldungen zusammengestellt, getrennt nach Szenario. Bei Bedarf lassen sie sich manuell aktualisieren.</p>
   <button id="refreshResultsBtn">Ergebnisse aktualisieren</button>
 
-  <div style="overflow-x:auto;margin-top:12px;">
-    <table id="resultsTable"></table>
-  </div>
+  <div id="resultsContainer" style="margin-top:12px;"></div>
   <p class="points-summary" id="resultsEmptyNote">Noch keine Rückmeldungen erfasst.</p>
 
   <div class="footer-bar">
@@ -208,6 +223,8 @@ let notes = scenarios.map(() => "");
 
 function totalPoints() { return dimensions.reduce((s, d) => s + Number(d.points), 0); }
 
+const MAX_SHORTLIST = 3;
+
 function renderScenarios() {
   const el = document.getElementById('scenarioList');
   el.innerHTML = '';
@@ -221,6 +238,10 @@ function renderScenarios() {
       <p class="scenario-tag" contenteditable="true" data-field="tag" data-i="${i}" data-placeholder="Kurzbeschreibung eingeben …">${s.tag}</p>
       <p class="scenario-desc" contenteditable="true" data-field="description" data-i="${i}" data-placeholder="Szenariotext eingeben …">${s.description}</p>
       <textarea class="note" placeholder="Notizen / offene Fragen zu diesem Szenario" data-i="${i}">${notes[i]}</textarea>
+      <label class="shortlist-label">
+        <input type="checkbox" class="shortlist-check" data-i="${i}" ${s.shortlist ? 'checked' : ''}>
+        In die engere Auswahl aufnehmen (maximal ${MAX_SHORTLIST} Szenarien)
+      </label>
     `;
     el.appendChild(div);
   });
@@ -229,6 +250,7 @@ function renderScenarios() {
       const i = Number(e.target.dataset.i);
       const field = e.target.dataset.field;
       scenarios[i][field] = e.target.textContent.trim();
+      renderScenarioSelect();
     });
   });
   el.querySelectorAll('textarea.note').forEach(node => {
@@ -236,6 +258,33 @@ function renderScenarios() {
       notes[Number(e.target.dataset.i)] = e.target.value;
     });
   });
+  el.querySelectorAll('.shortlist-check').forEach(node => {
+    node.addEventListener('change', e => {
+      const i = Number(e.target.dataset.i);
+      const currentlyChecked = scenarios.filter(s => s.shortlist).length;
+      if (e.target.checked && currentlyChecked >= MAX_SHORTLIST) {
+        alert(`Es können höchstens ${MAX_SHORTLIST} Szenarien gleichzeitig in der engeren Auswahl sein. Bitte zuerst ein anderes Szenario abwählen.`);
+        e.target.checked = false;
+        return;
+      }
+      scenarios[i].shortlist = e.target.checked;
+      renderScenarioSelect();
+    });
+  });
+}
+
+function renderScenarioSelect() {
+  const select = document.getElementById('scenarioSelect');
+  const current = select.value;
+  select.innerHTML = '<option value="">Bitte ein Szenario aus der engeren Auswahl wählen …</option>';
+  scenarios.forEach((s, i) => {
+    if (!s.shortlist) return;
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = s.name || `Szenario ${i + 1} (ohne Titel)`;
+    select.appendChild(opt);
+  });
+  if ([...select.options].some(o => o.value === current)) select.value = current;
 }
 
 function renderDims() {
@@ -246,7 +295,7 @@ function renderDims() {
     row.className = 'dim-row';
     row.innerHTML = `
       <span class="dim-name" contenteditable="true" data-i="${i}">${d.name}</span>
-      <input type="range" min="0" max="100" value="${d.points}" data-i="${i}">
+      <input type="range" min="0" max="50" value="${d.points}" data-i="${i}">
       <span class="dim-points" id="dimPts${i}">${d.points}</span>
     `;
     el.appendChild(row);
@@ -279,38 +328,53 @@ function updatePointsSummary() {
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzdsWsABvKsVM67RCJb-nCSO87BDvs-jrP4gRBPgacfqSDDtmGwwo6x2UL3Ah9ANwPH/exec';
 
 let resultEntries = [];
+let submittedScenarios = [];
 
-function computeAverage() {
-  if (resultEntries.length === 0) return null;
+function computeAverage(entries) {
+  if (entries.length === 0) return null;
   return dimensions.map((d, i) => {
-    const sum = resultEntries.reduce((s, r) => s + Number(r.points[i] || 0), 0);
-    return Math.round((sum / resultEntries.length) * 10) / 10;
+    const sum = entries.reduce((s, r) => s + Number(r.points[i] || 0), 0);
+    return Math.round((sum / entries.length) * 10) / 10;
   });
 }
 
 function renderResultsTable() {
-  const table = document.getElementById('resultsTable');
+  const container = document.getElementById('resultsContainer');
   const emptyNote = document.getElementById('resultsEmptyNote');
+  container.innerHTML = '';
   if (resultEntries.length === 0) {
-    table.innerHTML = '';
+    emptyNote.textContent = 'Noch keine Rückmeldungen erfasst.';
     emptyNote.style.display = 'block';
     return;
   }
   emptyNote.style.display = 'none';
-  let html = '<tr><th>Name</th>';
-  dimensions.forEach(d => { html += `<th>${d.name}</th>`; });
-  html += '<th>Summe</th></tr>';
-  resultEntries.forEach(r => {
-    const sum = r.points.reduce((s, v) => s + Number(v), 0);
-    html += `<tr><td><strong>${r.name}</strong></td>`;
-    r.points.forEach(p => { html += `<td>${p}</td>`; });
-    html += `<td>${sum}</td></tr>`;
+
+  const scenarioNames = [...new Set(resultEntries.map(r => r.scenario))];
+  scenarioNames.forEach(scenarioName => {
+    const entries = resultEntries.filter(r => r.scenario === scenarioName);
+    const heading = document.createElement('h3');
+    heading.style.marginTop = '18px';
+    heading.textContent = `${scenarioName} (${entries.length} Rückmeldungen)`;
+    container.appendChild(heading);
+
+    const wrap = document.createElement('div');
+    wrap.style.overflowX = 'auto';
+    let html = '<table><tr><th>Name</th>';
+    dimensions.forEach(d => { html += `<th>${d.name}</th>`; });
+    html += '<th>Summe</th></tr>';
+    entries.forEach(r => {
+      const sum = r.points.reduce((s, v) => s + Number(v), 0);
+      html += `<tr><td><strong>${r.name}</strong></td>`;
+      r.points.forEach(p => { html += `<td>${p}</td>`; });
+      html += `<td>${sum}</td></tr>`;
+    });
+    const avg = computeAverage(entries);
+    html += `<tr style="background:var(--teal-bg);"><td><strong>Durchschnitt</strong></td>`;
+    avg.forEach(v => { html += `<td><strong>${v}</strong></td>`; });
+    html += `<td><strong>${avg.reduce((s, v) => s + v, 0).toFixed(1)}</strong></td></tr></table>`;
+    wrap.innerHTML = html;
+    container.appendChild(wrap);
   });
-  const avg = computeAverage();
-  html += `<tr style="background:var(--teal-bg);"><td><strong>Durchschnitt (${resultEntries.length} Rückmeldungen)</strong></td>`;
-  avg.forEach(v => { html += `<td><strong>${v}</strong></td>`; });
-  html += `<td><strong>${avg.reduce((s, v) => s + v, 0).toFixed(1)}</strong></td></tr>`;
-  table.innerHTML = html;
 }
 
 async function loadResults() {
@@ -335,13 +399,17 @@ document.getElementById('refreshResultsBtn').addEventListener('click', loadResul
 
 document.getElementById('submitResultBtn').addEventListener('click', async () => {
   const nameInput = document.getElementById('personName');
+  const scenarioSelect = document.getElementById('scenarioSelect');
   const status = document.getElementById('submitStatus');
   const name = nameInput.value.trim();
+  const scenarioIndex = scenarioSelect.value;
   if (!name) { alert('Bitte zuerst deinen Namen eintragen.'); return; }
+  if (scenarioIndex === '') { alert('Bitte zuerst ein Szenario aus der engeren Auswahl wählen.'); return; }
   if (!SCRIPT_URL || SCRIPT_URL.indexOf('PASTE_YOUR') === 0) {
     alert('Die Verbindung zur Ergebnisliste ist noch nicht eingerichtet. Bitte bei der Moderation melden.');
     return;
   }
+  const scenarioName = scenarios[Number(scenarioIndex)].name || `Szenario ${Number(scenarioIndex) + 1}`;
   const points = dimensions.map(d => d.points);
   status.textContent = 'Wird gesendet …';
   status.className = 'points-summary';
@@ -349,9 +417,16 @@ document.getElementById('submitResultBtn').addEventListener('click', async () =>
     await fetch(SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ name, points })
+      body: JSON.stringify({ name, scenario: scenarioName, points })
     });
-    status.textContent = `Danke, ${name}! Deine Rückmeldung wurde übermittelt.`;
+    status.textContent = `Danke, ${name}! Deine Rückmeldung für „${scenarioName}" wurde übermittelt.`;
+    if (!submittedScenarios.includes(scenarioName)) submittedScenarios.push(scenarioName);
+    document.getElementById('submittedNote').textContent = submittedScenarios.length
+      ? `Bereits gesendet für: ${submittedScenarios.join(', ')}`
+      : '';
+    dimensions.forEach(d => d.points = 20);
+    renderDims();
+    scenarioSelect.value = '';
     await loadResults();
   } catch (err) {
     status.textContent = 'Senden fehlgeschlagen. Bitte erneut versuchen.';
@@ -363,14 +438,18 @@ document.getElementById('addScenarioBtn').addEventListener('click', () => {
   scenarios.push({ name: '', tag: '', description: '', open: true, placeholder: true });
   notes.push('');
   renderScenarios();
+  renderScenarioSelect();
 });
 
 function buildPrintHTML() {
   const name = document.getElementById('personName').value.trim();
+  const scenarioSelect = document.getElementById('scenarioSelect');
+  const scenarioName = scenarioSelect.value !== '' ? scenarioSelect.options[scenarioSelect.selectedIndex].textContent : '';
   let html = `<div style="font-family: Georgia, serif; padding: 20px;">
     <h1 style="font-size:22px;">Szenarienbewertung – KEB Landesgeschäftsstelle Rheinland-Pfalz</h1>
     <p style="color:#555;font-size:13px;">Zukunfts-AG · Sitzung am 19.08.2026 in Mainz</p>
     ${name ? `<p style="font-size:15px;margin-top:10px;"><strong>Eingetragen von:</strong> ${name}</p>` : '<p style="font-size:13px;color:#99381C;"><em>Kein Name eingetragen</em></p>'}
+    ${scenarioName ? `<p style="font-size:14px;"><strong>Aktuell ausgewähltes Szenario:</strong> ${scenarioName}</p>` : ''}
     <h2 style="font-size:17px;margin-top:24px;">Erwartungen an die Geschäftsstelle und Priorisierung</h2>
     <table style="border-collapse:collapse;width:100%;font-size:13px;">
       <tr><th style="text-align:left;border-bottom:1px solid #ccc;padding:6px;">Erwartung</th><th style="text-align:right;border-bottom:1px solid #ccc;padding:6px;">Punkte</th></tr>`;
@@ -380,28 +459,34 @@ function buildPrintHTML() {
   html += `<tr><td style="padding:6px;font-weight:bold;">Summe</td><td style="text-align:right;padding:6px;font-weight:bold;">${totalPoints()}</td></tr>`;
   html += `</table>`;
   if (resultEntries.length > 0) {
-    const avg = computeAverage();
-    html += `<h2 style="font-size:17px;margin-top:24px;">Dokumentierte Rückmeldungen (${resultEntries.length})</h2>
-      <table style="border-collapse:collapse;width:100%;font-size:12px;">
-        <tr><th style="text-align:left;border-bottom:1px solid #ccc;padding:5px;">Name</th>`;
-    dimensions.forEach(d => { html += `<th style="border-bottom:1px solid #ccc;padding:5px;">${d.name}</th>`; });
-    html += `<th style="border-bottom:1px solid #ccc;padding:5px;">Summe</th></tr>`;
-    resultEntries.forEach(r => {
-      const sum = r.points.reduce((s, v) => s + Number(v), 0);
-      html += `<tr><td style="padding:5px;border-bottom:1px solid #eee;">${r.name}</td>`;
-      r.points.forEach(p => { html += `<td style="text-align:center;padding:5px;border-bottom:1px solid #eee;">${p}</td>`; });
-      html += `<td style="text-align:center;padding:5px;border-bottom:1px solid #eee;">${sum}</td></tr>`;
+    const scenarioNames = [...new Set(resultEntries.map(r => r.scenario))];
+    html += `<h2 style="font-size:17px;margin-top:24px;">Dokumentierte Rückmeldungen</h2>`;
+    scenarioNames.forEach(sn => {
+      const entries = resultEntries.filter(r => r.scenario === sn);
+      const avg = computeAverage(entries);
+      html += `<h3 style="font-size:14px;margin-top:14px;">${sn} (${entries.length} Rückmeldungen)</h3>
+        <table style="border-collapse:collapse;width:100%;font-size:12px;">
+          <tr><th style="text-align:left;border-bottom:1px solid #ccc;padding:5px;">Name</th>`;
+      dimensions.forEach(d => { html += `<th style="border-bottom:1px solid #ccc;padding:5px;">${d.name}</th>`; });
+      html += `<th style="border-bottom:1px solid #ccc;padding:5px;">Summe</th></tr>`;
+      entries.forEach(r => {
+        const sum = r.points.reduce((s, v) => s + Number(v), 0);
+        html += `<tr><td style="padding:5px;border-bottom:1px solid #eee;">${r.name}</td>`;
+        r.points.forEach(p => { html += `<td style="text-align:center;padding:5px;border-bottom:1px solid #eee;">${p}</td>`; });
+        html += `<td style="text-align:center;padding:5px;border-bottom:1px solid #eee;">${sum}</td></tr>`;
+      });
+      html += `<tr style="background:#E6F5F6;"><td style="padding:5px;font-weight:bold;">Durchschnitt</td>`;
+      avg.forEach(v => { html += `<td style="text-align:center;padding:5px;font-weight:bold;">${v}</td>`; });
+      html += `<td style="text-align:center;padding:5px;font-weight:bold;">${avg.reduce((s, v) => s + v, 0).toFixed(1)}</td></tr>`;
+      html += `</table>`;
     });
-    html += `<tr style="background:#E6F5F6;"><td style="padding:5px;font-weight:bold;">Durchschnitt</td>`;
-    avg.forEach(v => { html += `<td style="text-align:center;padding:5px;font-weight:bold;">${v}</td>`; });
-    html += `<td style="text-align:center;padding:5px;font-weight:bold;">${avg.reduce((s, v) => s + v, 0).toFixed(1)}</td></tr>`;
-    html += `</table>`;
   }
   html += `<h2 style="font-size:17px;margin-top:24px;">Szenarien zur Orientierung</h2>`;
   scenarios.forEach((s, i) => {
     if (s.placeholder && !s.name && !s.description) return;
     html += `<div style="margin-bottom:14px;">
       <h3 style="font-size:14px;margin:0 0 2px;">Szenario ${i + 1}: ${s.name || '(ohne Titel)'}${s.open ? ' (noch zu präzisieren)' : ''}</h3>
+      ${s.shortlist ? '<p style="font-size:11px;color:#7BC9CE;font-weight:bold;">In der engeren Auswahl</p>' : ''}
       <p style="font-size:12px;color:#E72371;font-style:italic;margin:0 0 4px;">${s.tag}</p>
       <p style="font-size:12.5px;color:#333;">${s.description}</p>
       ${notes[i] ? `<p style="font-size:12px;color:#555;"><em>Notizen: ${notes[i]}</em></p>` : ''}
@@ -430,6 +515,7 @@ document.getElementById('exportWordBtn').addEventListener('click', () => {
 
 
 renderScenarios();
+renderScenarioSelect();
 renderDims();
 loadResults();
 </script>
